@@ -393,26 +393,51 @@ function mkChart(id,type,data,opts){
 
 function carregar(){
   lp(15,'Buscando dados...');
-  fetch(WEBAPP_URL, {redirect:'follow'})
-    .then(function(r){ return r.json(); })
-    .then(function(j){
-      if(!j||j.ok===false) throw new Error(j&&j.erro?j.erro:'Erro na resposta');
+
+  // Remover script anterior se existir
+  var old=document.getElementById('_jsonp_s');
+  if(old)old.remove();
+
+  // Timeout de 12s
+  var tOut=setTimeout(function(){
+    lp(100,'');
+    var lm=document.getElementById('lm');
+    lm.textContent='⚠️ Timeout — verifique se o Web App está publicado como "Qualquer pessoa" no Apps Script';
+    document.getElementById('lf').style.background='var(--amb)';
+  },12000);
+
+  // Callback global que o JSONP vai chamar
+  window._sandCb=function(j){
+    clearTimeout(tOut);
+    try{
+      if(!j||j.ok===false)throw new Error(j&&j.erro?j.erro:'Sem dados');
       D=j;
       var agN={},pN=[];
       (D.pArr||[]).forEach(function(p){
         var k=normPer(p);
         var a=D.agP[p]||D.agP[k]||{};
-        a.label=labelPer(k);
-        agN[k]=a; pN.push(k);
+        a.label=labelPer(k);agN[k]=a;pN.push(k);
       });
-      D.agP=agN; D.pArr=pN;
-      lp(100,''); setTimeout(render,200);
-    })
-    .catch(function(e){
+      D.agP=agN;D.pArr=pN;
+      lp(100,'');setTimeout(render,200);
+    }catch(e){
       lp(100,'');
       document.getElementById('lm').textContent='⚠️ '+e.message;
       document.getElementById('lf').style.background='var(--red)';
-    });
+    }
+  };
+
+  // Injetar script JSONP — funciona sem CORS
+  var s=document.createElement('script');
+  s.id='_jsonp_s';
+  s.src=WEBAPP_URL+'?callback=_sandCb&t='+Date.now();
+  s.onerror=function(){
+    clearTimeout(tOut);
+    lp(100,'');
+    document.getElementById('lm').textContent='⚠️ Erro ao carregar script — verifique o Web App';
+    document.getElementById('lf').style.background='var(--red)';
+  };
+  document.head.appendChild(s);
 }
 
 function render(){
